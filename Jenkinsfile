@@ -35,6 +35,7 @@ pipeline {
                 '''
             }
         }
+
         stage('Ensure PHP Extensions') {
             steps {
                 sh '''
@@ -104,12 +105,6 @@ EOF
                     ssh -o StrictHostKeyChecking=no ${SSH_USER}@${DEPLOY_SERVER} \
                         "cd ${DEPLOY_PATH} && ${PHP_BIN} /usr/local/bin/composer install --optimize-autoloader && ${PHP_BIN} artisan test"
                 '''
-            }
-        }
-
-        stage('Approval') {
-            steps {
-                input message: "Do you approve this deployment to ${DEPLOY_SERVER}?", ok: "Deploy"
             }
         }
 
