@@ -49,9 +49,39 @@ echo
 
 if [ "$(id -u)" -ne 0 ]; then
     echo "ERROR: This script must run as root."
-    echo "Use: sudo deploy/provision-worker.sh"
+    echo "Use: sudo bash deploy/provision-worker.sh"
     exit 1
 fi
+
+
+# ============================================================
+# Deployment user
+# ============================================================
+
+# When GitHub Actions runs:
+#   nuruzzaman -> sudo bash deploy/provision-worker.sh
+#
+# SUDO_USER will therefore be the GitHub Actions runner user.
+# This avoids hard-coding a a fixed deployment user.
+
+if [ -n "${SUDO_USER:-}" ] && [ "${SUDO_USER}" != "root" ]; then
+    DEPLOY_USER="${SUDO_USER}"
+else
+    DEPLOY_USER="$(stat -c '%U' /opt/actions-runner 2>/dev/null || true)"
+fi
+
+if [ -z "${DEPLOY_USER}" ] || [ "${DEPLOY_USER}" = "root" ]; then
+    echo "ERROR: Could not determine deployment user."
+    echo "This script should be executed through sudo by the GitHub Actions runner user."
+    exit 1
+fi
+
+if ! id "${DEPLOY_USER}" >/dev/null 2>&1; then
+    echo "ERROR: Deployment user '${DEPLOY_USER}' does not exist."
+    exit 1
+fi
+
+echo "Deployment user: ${DEPLOY_USER}"
 
 
 # ============================================================
@@ -316,7 +346,7 @@ mkdir -p \
 
 echo "==> Setting deployment permissions..."
 
-chown -R deployer:www-data "${DEPLOY_PATH}"
+chown -R "${DEPLOY_USER}:www-data" "${DEPLOY_PATH}"
 
 find "${DEPLOY_PATH}" \
     -type d \
@@ -412,14 +442,15 @@ echo "==> Enabling services..."
 
 systemctl enable --now nginx
 systemctl enable --now "php${PHP_VERSION}-fpm"
-systemctl enable --now mysql
 
 
 # ============================================================
 # Final permissions
 # ============================================================
 
-chown -R deployer:www-data "${DEPLOY_PATH}"
+echo "==> Applying final permissions..."
+
+chown -R "${DEPLOY_USER}:www-data" "${DEPLOY_PATH}"
 
 chmod 775 "${DEPLOY_PATH}"
 chmod 775 "${RELEASES_PATH}"
@@ -448,6 +479,10 @@ echo
 echo "============================================================"
 echo " Provisioning completed successfully"
 echo "============================================================"
+
+echo
+echo "Deployment user:"
+echo "${DEPLOY_USER}"
 
 echo
 echo "PHP:"
@@ -488,3 +523,57 @@ echo
 echo "============================================================"
 echo " Worker01 is ready for Forum Pipe deployment"
 echo "============================================================"
+
+
+
+
+
+
+
+# #!/bin/bash
+
+# # ============================================================
+# # Forum Pipe - Worker Provisioning
+# # Target: worker01
+# # OS: Ubuntu 24.04
+# # Deployment: Non-Docker
+# # Web: Nginx
+# # PHP: 8.1
+# # Node.js: 18
+# # Database: MySQL 8
+# # ============================================================
+
+# set -euo pipefail
+
+# PHP_VERSION="8.1"
+# NODE_MAJOR="18"
+
+# APP_NAME="Forum Pipe"
+# APP_DOMAIN="forum.local"
+
+# DEPLOY_PATH="/var/www/forum-pipe"
+# RELEASES_PATH="${DEPLOY_PATH}/releases"
+# SHARED_PATH="${DEPLOY_PATH}/shared"
+# CURRENT_PATH="${DEPLOY_PATH}/current"
+
+# DB_NAME="forum"
+# DB_USER="forum_user"
+# DB_PASSWORD="forum_password"
+
+# NGINX_CONF="/etc/nginx/sites-available/forum-pipe"
+# NGINX_LINK="/etc/nginx/sites-enabled/forum-pipe"
+
+# echo
+# echo "============================================================"
+# echo " Forum Pipe - Worker Provisioning"
+# echo "============================================================"
+# echo " Host:          $(hostname)"
+# echo " PHP:           ${PHP_VERSION}"
+# echo " Node.js:       ${NODE_MAJOR}"
+# echo " Deploy path:   ${DEPLOY_PATH}"
+# echo "============================================================"
+# echo
+
+
+# # ============================================================
+# # Root check
