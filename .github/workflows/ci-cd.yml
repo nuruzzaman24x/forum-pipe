@@ -94,7 +94,7 @@ jobs:
           sed -i 's/^DB_DATABASE=.*/DB_DATABASE=forum/' .env
           sed -i 's/^DB_USERNAME=.*/DB_USERNAME=forum_user/' .env
           sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=forum_password/' .env
-          
+
           echo "=== CI DATABASE CONFIG ==="
           grep '^DB_' .env
 
@@ -178,6 +178,25 @@ jobs:
         uses: actions/checkout@v4
 
       # --------------------------------------------------------
+      # Determine deploy user (works for ANY sudo user, not
+      # hardcoded — whoever the self-hosted runner service
+      # actually runs as gets picked up automatically)
+      # --------------------------------------------------------
+
+      - name: Determine deploy user
+        run: |
+          DEPLOY_USER="$(id -un)"
+
+          if [ -z "$DEPLOY_USER" ] || [ "$DEPLOY_USER" = "root" ]; then
+            echo "ERROR: Could not safely determine a non-root deploy user."
+            echo "Make sure the self-hosted runner service runs as a normal user."
+            exit 1
+          fi
+
+          echo "Detected deploy user: $DEPLOY_USER"
+          echo "DEPLOY_USER=${DEPLOY_USER}" >> "$GITHUB_ENV"
+
+      # --------------------------------------------------------
       # Deployment information
       # --------------------------------------------------------
 
@@ -187,7 +206,7 @@ jobs:
           echo "Forum Pipe Deployment"
           echo "========================================"
           echo "Runner : $(hostname)"
-          echo "User   : $(whoami)"
+          echo "User   : $DEPLOY_USER"
           echo "Date   : $(date)"
           echo "Path   : $DEPLOY_PATH"
           echo "========================================"
@@ -220,7 +239,7 @@ jobs:
             "$RELEASES_PATH/$RELEASE_ID"
 
           sudo chown -R \
-            nuruzzaman:nuruzzaman \
+            "$DEPLOY_USER":"$DEPLOY_USER" \
             "$RELEASES_PATH/$RELEASE_ID"
 
       # --------------------------------------------------------
@@ -248,7 +267,7 @@ jobs:
             "$SHARED_PATH/storage"
 
           sudo chown -R \
-            nuruzzaman:www-data \
+            "$DEPLOY_USER":www-data \
             "$SHARED_PATH"
 
           sudo chmod -R 775 \
@@ -303,7 +322,7 @@ jobs:
             # end here ---
 
             sudo chown \
-              nuruzzaman:www-data \
+              "$DEPLOY_USER":www-data \
               "$SHARED_PATH/.env"
 
             sudo chmod 640 \
@@ -420,7 +439,7 @@ jobs:
         run: |
 
           sudo chown -R \
-            nuruzzaman:www-data \
+            "$DEPLOY_USER":www-data \
             "$RELEASES_PATH/$RELEASE_ID"
 
           sudo chmod -R 775 \
@@ -495,4 +514,507 @@ jobs:
           ls -1dt */ 2>/dev/null \
             | tail -n +6 \
             | xargs -r sudo rm -rf
+
+
+
+
+
+
+# name: Forum Pipe CI/CD
+
+# on:
+#   push:
+#     branches:
+#       - master
+
+#   pull_request:
+#     branches:
+#       - master
+
+#   workflow_dispatch:
+
+# permissions:
+#   contents: read
+
+# env:
+#   APP_NAME: "Forum Pipe"
+#   APP_ENV: production
+#   APP_DEBUG: "false"
+
+#   DEPLOY_PATH: /var/www/forum-pipe
+#   RELEASES_PATH: /var/www/forum-pipe/releases
+#   SHARED_PATH: /var/www/forum-pipe/shared
+#   CURRENT_PATH: /var/www/forum-pipe/current
+
+#   PHP_VERSION: "8.1"
+#   NODE_VERSION: "18"
+
+# jobs:
+
+#   # ==========================================================
+#   # CI
+#   # ==========================================================
+
+#   ci:
+#     name: CI - Test & Build
+#     runs-on: ubuntu-latest
+
+#     services:
+#       mysql:
+#         image: mysql:8.0
+
+#         env:
+#           MYSQL_ROOT_PASSWORD: root
+#           MYSQL_DATABASE: forum
+#           MYSQL_USER: forum_user
+#           MYSQL_PASSWORD: forum_password
+
+#         ports:
+#           - 3306:3306
+
+#         options: >-
+#           --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+#           --health-interval=10s
+#           --health-timeout=5s
+#           --health-retries=10
+
+#     steps:
+
+#       # --------------------------------------------------------
+#       # Checkout
+#       # --------------------------------------------------------
+
+#       - name: Checkout source
+#         uses: actions/checkout@v4
+
+#       # --------------------------------------------------------
+#       # PHP
+#       # --------------------------------------------------------
+
+#       - name: Setup PHP 8.1
+#         uses: shivammathur/setup-php@v2
+#         with:
+#           php-version: "8.1"
+#           extensions: mbstring, xml, ctype, iconv, intl, pdo, pdo_mysql, bcmath, curl, zip, gd
+#           tools: composer
+#           coverage: none
+
+#       # --------------------------------------------------------
+#       # Laravel environment for CI
+#       # --------------------------------------------------------
+
+#       - name: Prepare Laravel environment
+#         run: |
+#           cp .env.example .env
+
+#           sed -i 's/^APP_ENV=.*/APP_ENV=testing/' .env
+#           sed -i 's/^APP_DEBUG=.*/APP_DEBUG=true/' .env
+#           sed -i 's#^APP_URL=.*#APP_URL=http://127.0.0.1#' .env
+#           sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=mysql/' .env
+#           sed -i 's/^DB_HOST=.*/DB_HOST=127.0.0.1/' .env
+#           sed -i 's/^DB_PORT=.*/DB_PORT=3306/' .env
+#           sed -i 's/^DB_DATABASE=.*/DB_DATABASE=forum/' .env
+#           sed -i 's/^DB_USERNAME=.*/DB_USERNAME=forum_user/' .env
+#           sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=forum_password/' .env
+          
+#           echo "=== CI DATABASE CONFIG ==="
+#           grep '^DB_' .env
+
+#       # --------------------------------------------------------
+#       # Composer
+#       # --------------------------------------------------------
+
+#       - name: Install PHP dependencies
+#         run: |
+#           composer install \
+#             --no-interaction \
+#             --prefer-dist \
+#             --optimize-autoloader
+
+#       # --------------------------------------------------------
+#       # Laravel
+#       # --------------------------------------------------------
+
+#       - name: Generate Laravel application key
+#         run: |
+#           php artisan key:generate --force
+
+#       - name: Run database migrations
+#         run: |
+#           php artisan migrate --force
+
+#       # --------------------------------------------------------
+#       # Tests
+#       # --------------------------------------------------------
+
+#       - name: Run Laravel tests
+#         run: |
+#           php artisan test
+
+#       # --------------------------------------------------------
+#       # Node.js
+#       # --------------------------------------------------------
+
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: "18"
+#           cache: npm
+
+#       - name: Install frontend dependencies
+#         run: |
+#           npm ci
+
+#       - name: Build frontend assets
+#         env:
+#           NODE_OPTIONS: --openssl-legacy-provider
+#         run: |
+#           npm run production
+
+
+#   # ==========================================================
+#   # CD
+#   # ==========================================================
+
+#   deploy:
+#     name: CD - Deploy to ansible
+#     needs: ci
+
+#     # IMPORTANT:
+#     # This job runs directly on the local self-hosted server.
+#     # No SSH is required.
+#     runs-on:
+#       - self-hosted
+#       - Linux
+#       - X64
+
+#     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+
+#     steps:
+
+#       # --------------------------------------------------------
+#       # Checkout source
+#       # --------------------------------------------------------
+
+#       - name: Checkout source
+#         uses: actions/checkout@v4
+
+#       # --------------------------------------------------------
+#       # Deployment information
+#       # --------------------------------------------------------
+
+#       - name: Show deployment information
+#         run: |
+#           echo "========================================"
+#           echo "Forum Pipe Deployment"
+#           echo "========================================"
+#           echo "Runner : $(hostname)"
+#           echo "User   : $(whoami)"
+#           echo "Date   : $(date)"
+#           echo "Path   : $DEPLOY_PATH"
+#           echo "========================================"
+
+#       # --------------------------------------------------------
+#       # Automatic server provisioning
+#       # --------------------------------------------------------
+#       #
+#       # This script automatically prepares the server.
+#       # No manual PHP / Composer / Node / Nginx installation.
+#       #
+#       # --------------------------------------------------------
+
+#       - name: Provision ansible server
+#         run: |
+#           chmod +x deploy/provision-worker.sh
+#           sudo bash deploy/provision-worker.sh
+
+#       # --------------------------------------------------------
+#       # Create release
+#       # --------------------------------------------------------
+
+#       - name: Create release directory
+#         run: |
+#           RELEASE_ID="${GITHUB_SHA}-${GITHUB_RUN_NUMBER}"
+
+#           echo "RELEASE_ID=${RELEASE_ID}" >> "$GITHUB_ENV"
+
+#           sudo mkdir -p \
+#             "$RELEASES_PATH/$RELEASE_ID"
+
+#           sudo chown -R \
+#             nuruzzaman:nuruzzaman \
+#             "$RELEASES_PATH/$RELEASE_ID"
+
+#       # --------------------------------------------------------
+#       # Copy application
+#       # --------------------------------------------------------
+
+#       - name: Copy application to release
+#         run: |
+#           rsync -a \
+#             --delete \
+#             --exclude='.git/' \
+#             --exclude='.env' \
+#             --exclude='node_modules/' \
+#             --exclude='storage/' \
+#             ./ \
+#             "$RELEASES_PATH/$RELEASE_ID/"
+
+#       # --------------------------------------------------------
+#       # Prepare shared Laravel directories
+#       # --------------------------------------------------------
+
+#       - name: Prepare shared directories
+#         run: |
+#           sudo mkdir -p \
+#             "$SHARED_PATH/storage"
+
+#           sudo chown -R \
+#             nuruzzaman:www-data \
+#             "$SHARED_PATH"
+
+#           sudo chmod -R 775 \
+#             "$SHARED_PATH/storage"
+
+#       # --------------------------------------------------------
+#       # Create production .env
+#       # --------------------------------------------------------
+#       - name: Create production environment
+#         run: |
+
+#           if [ ! -f "$SHARED_PATH/.env" ]; then
+
+#             cp .env.example "$SHARED_PATH/.env"
+
+#             sed -i 's/^APP_NAME=.*/APP_NAME="Forum Pipe"/' \
+#               "$SHARED_PATH/.env"
+
+#             sed -i 's/^APP_ENV=.*/APP_ENV=production/' \
+#               "$SHARED_PATH/.env"
+
+#             sed -i 's/^APP_DEBUG=.*/APP_DEBUG=false/' \
+#               "$SHARED_PATH/.env"
+
+#             sed -i 's/^CACHE_DRIVER=.*/CACHE_DRIVER=file/' \
+#               "$SHARED_PATH/.env"
+
+#             sed -i 's/^SESSION_DRIVER=.*/SESSION_DRIVER=file/' \
+#               "$SHARED_PATH/.env"
+
+#             sed -i 's/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=sync/' \
+#               "$SHARED_PATH/.env"
+
+#             # database configuration ---
+#             sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=mysql/' \
+#               "$SHARED_PATH/.env"
+
+#             sed -i 's/^DB_HOST=.*/DB_HOST=127.0.0.1/' \
+#               "$SHARED_PATH/.env"
+
+#             sed -i 's/^DB_PORT=.*/DB_PORT=3306/' \
+#               "$SHARED_PATH/.env"
+
+#             sed -i 's/^DB_DATABASE=.*/DB_DATABASE=forum/' \
+#               "$SHARED_PATH/.env"
+
+#             sed -i 's/^DB_USERNAME=.*/DB_USERNAME=forum_user/' \
+#               "$SHARED_PATH/.env"
+
+#             sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=forum_password/' \
+#               "$SHARED_PATH/.env"
+#             # end here ---
+
+#             sudo chown \
+#               nuruzzaman:www-data \
+#               "$SHARED_PATH/.env"
+
+#             sudo chmod 640 \
+#               "$SHARED_PATH/.env"
+
+#           fi
+
+
+#       # --------------------------------------------------------
+#       # Link shared .env and storage
+#       # --------------------------------------------------------
+
+#       - name: Link shared Laravel files
+#         run: |
+
+#           RELEASE="$RELEASES_PATH/$RELEASE_ID"
+
+#           rm -f "$RELEASE/.env"
+
+#           ln -s \
+#             "$SHARED_PATH/.env" \
+#             "$RELEASE/.env"
+
+#           rm -rf "$RELEASE/storage"
+
+#           ln -s \
+#             "$SHARED_PATH/storage" \
+#             "$RELEASE/storage"
+
+#       # --------------------------------------------------------
+#       # Install Composer dependencies
+#       # --------------------------------------------------------
+
+#       - name: Install Composer dependencies
+#         working-directory: ${{ env.RELEASES_PATH }}/${{ env.RELEASE_ID }}
+#         run: |
+#           composer install \
+#             --no-dev \
+#             --no-interaction \
+#             --prefer-dist \
+#             --optimize-autoloader
+
+#       # --------------------------------------------------------
+#       # Install Node dependencies
+#       # --------------------------------------------------------
+
+#       - name: Install Node dependencies
+#         working-directory: ${{ env.RELEASES_PATH }}/${{ env.RELEASE_ID }}
+#         run: |
+#           npm ci
+
+#       # --------------------------------------------------------
+#       # Build frontend
+#       # --------------------------------------------------------
+
+#       - name: Build frontend
+#         working-directory: ${{ env.RELEASES_PATH }}/${{ env.RELEASE_ID }}
+#         env:
+#           NODE_OPTIONS: --openssl-legacy-provider
+#         run: |
+#           npm run production
+
+#       # --------------------------------------------------------
+#       # Generate APP_KEY if missing
+#       # --------------------------------------------------------
+
+#       - name: Generate application key if missing
+#         working-directory: ${{ env.RELEASES_PATH }}/${{ env.RELEASE_ID }}
+#         run: |
+
+#           if grep -q '^APP_KEY=$' "$SHARED_PATH/.env"; then
+#             php artisan key:generate --force
+#           fi
+
+#       # --------------------------------------------------------
+#       # Database migration
+#       # --------------------------------------------------------
+
+#       - name: Run database migrations
+#         working-directory: ${{ env.RELEASES_PATH }}/${{ env.RELEASE_ID }}
+#         run: |
+#           php artisan migrate --force
+
+#       # --------------------------------------------------------
+#       # Storage link
+#       # --------------------------------------------------------
+
+#       - name: Create storage link
+#         working-directory: ${{ env.RELEASES_PATH }}/${{ env.RELEASE_ID }}
+#         run: |
+#           php artisan storage:link || true
+
+#       # --------------------------------------------------------
+#       # Laravel cache
+#       # --------------------------------------------------------
+
+#       - name: Cache Laravel configuration
+#         working-directory: ${{ env.RELEASES_PATH }}/${{ env.RELEASE_ID }}
+#         run: |
+
+#           php artisan config:clear
+#           php artisan route:clear
+#           php artisan view:clear
+
+#           php artisan config:cache
+#           php artisan route:cache
+#           php artisan view:cache
+
+#       # --------------------------------------------------------
+#       # Permissions
+#       # --------------------------------------------------------
+
+#       - name: Fix Laravel permissions
+#         run: |
+
+#           sudo chown -R \
+#             nuruzzaman:www-data \
+#             "$RELEASES_PATH/$RELEASE_ID"
+
+#           sudo chmod -R 775 \
+#             "$RELEASES_PATH/$RELEASE_ID/storage"
+
+#           sudo chmod -R 775 \
+#             "$RELEASES_PATH/$RELEASE_ID/bootstrap/cache"
+
+#       # --------------------------------------------------------
+#       # Activate release
+#       # --------------------------------------------------------
+
+#       - name: Activate release
+#         run: |
+
+#           sudo ln -sfn \
+#             "$RELEASES_PATH/$RELEASE_ID" \
+#             "$CURRENT_PATH"
+
+#       # --------------------------------------------------------
+#       # Reload PHP-FPM
+#       # --------------------------------------------------------
+
+#       - name: Reload PHP-FPM
+#         run: |
+#           sudo systemctl reload php8.1-fpm
+
+#       # --------------------------------------------------------
+#       # Reload Nginx
+#       # --------------------------------------------------------
+
+#       - name: Test and reload Nginx
+#         run: |
+
+#           sudo nginx -t
+
+#           sudo systemctl reload nginx
+
+#       # --------------------------------------------------------
+#       # Health check
+#       # --------------------------------------------------------
+
+#       - name: Application health check
+#         run: |
+
+#           sleep 3
+
+#           curl \
+#             --fail \
+#             --silent \
+#             --show-error \
+#             --max-time 15 \
+#             http://127.0.0.1/
+
+#           echo ""
+
+#           echo "========================================"
+#           echo "Deployment successful"
+#           echo "Release: $RELEASE_ID"
+#           echo "========================================"
+
+#       # --------------------------------------------------------
+#       # Cleanup old releases
+#       # --------------------------------------------------------
+
+#       - name: Cleanup old releases
+#         if: success()
+#         run: |
+
+#           cd "$RELEASES_PATH"
+
+#           ls -1dt */ 2>/dev/null \
+#             | tail -n +6 \
+#             | xargs -r sudo rm -rf
             
