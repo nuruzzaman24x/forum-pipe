@@ -136,4 +136,4 @@ jobs:
       - name: Health check
         run: |
           sleep 5
-          curl -sSf http://118.179.23.218/ || exit 1
+          curl -sSf http://172.17.0.236/ || exit 1
