@@ -94,6 +94,9 @@ jobs:
           sed -i 's/^DB_DATABASE=.*/DB_DATABASE=forum/' .env
           sed -i 's/^DB_USERNAME=.*/DB_USERNAME=forum_user/' .env
           sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=forum_password/' .env
+          
+          echo "=== CI DATABASE CONFIG ==="
+          grep '^DB_' .env
 
       # --------------------------------------------------------
       # Composer
