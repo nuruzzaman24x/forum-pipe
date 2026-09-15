@@ -108,13 +108,13 @@ jobs:
             rm -rf "$RELEASE_DIR/storage"
             ln -nfs "$DEPLOY_PATH/shared/storage" "$RELEASE_DIR/storage"
 
-            sudo chown -R deployer:www-data "$DEPLOY_PATH/shared/storage"
+            sudo chown -R nuruzzaman:www-data "$DEPLOY_PATH/shared/storage"
             sudo find "$DEPLOY_PATH/shared/storage" -type d -exec chmod 775 {} \;
             sudo find "$DEPLOY_PATH/shared/storage" -type f -exec chmod 664 {} \;
 
             composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
 
-            sudo chown -R deployer:www-data "$RELEASE_DIR/bootstrap/cache"
+            sudo chown -R nuruzzaman:www-data "$RELEASE_DIR/bootstrap/cache"
             sudo chmod -R 775 "$RELEASE_DIR/bootstrap/cache"
 
             npm install
