@@ -257,7 +257,6 @@ jobs:
       # --------------------------------------------------------
       # Create production .env
       # --------------------------------------------------------
-
       - name: Create production environment
         run: |
 
@@ -283,6 +282,26 @@ jobs:
             sed -i 's/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=sync/' \
               "$SHARED_PATH/.env"
 
+            # --- নতুন লাইন যোগ করুন: database configuration ---
+            sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=mysql/' \
+              "$SHARED_PATH/.env"
+
+            sed -i 's/^DB_HOST=.*/DB_HOST=127.0.0.1/' \
+              "$SHARED_PATH/.env"
+
+            sed -i 's/^DB_PORT=.*/DB_PORT=3306/' \
+              "$SHARED_PATH/.env"
+
+            sed -i 's/^DB_DATABASE=.*/DB_DATABASE=forum/' \
+              "$SHARED_PATH/.env"
+
+            sed -i 's/^DB_USERNAME=.*/DB_USERNAME=forum_user/' \
+              "$SHARED_PATH/.env"
+
+            sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=forum_password/' \
+              "$SHARED_PATH/.env"
+            # --- এখানে শেষ ---
+
             sudo chown \
               nuruzzaman:www-data \
               "$SHARED_PATH/.env"
@@ -291,6 +310,51 @@ jobs:
               "$SHARED_PATH/.env"
 
           fi
+
+
+
+
+
+
+
+
+
+      # - name: Create production environment
+      #   run: |
+
+      #     if [ ! -f "$SHARED_PATH/.env" ]; then
+
+      #       cp .env.example "$SHARED_PATH/.env"
+
+      #       sed -i 's/^APP_NAME=.*/APP_NAME="Forum Pipe"/' \
+      #         "$SHARED_PATH/.env"
+
+      #       sed -i 's/^APP_ENV=.*/APP_ENV=production/' \
+      #         "$SHARED_PATH/.env"
+
+      #       sed -i 's/^APP_DEBUG=.*/APP_DEBUG=false/' \
+      #         "$SHARED_PATH/.env"
+
+      #       sed -i 's/^CACHE_DRIVER=.*/CACHE_DRIVER=file/' \
+      #         "$SHARED_PATH/.env"
+
+      #       sed -i 's/^SESSION_DRIVER=.*/SESSION_DRIVER=file/' \
+      #         "$SHARED_PATH/.env"
+
+      #       sed -i 's/^QUEUE_CONNECTION=.*/QUEUE_CONNECTION=sync/' \
+      #         "$SHARED_PATH/.env"
+
+      #       sudo chown \
+      #         nuruzzaman:www-data \
+      #         "$SHARED_PATH/.env"
+
+      #       sudo chmod 640 \
+      #         "$SHARED_PATH/.env"
+
+      #     fi
+
+
+          
 
       # --------------------------------------------------------
       # Link shared .env and storage
